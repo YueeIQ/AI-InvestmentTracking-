@@ -28,6 +28,10 @@ export const saveHoldings = (holdings: Holding[]): void => {
 // --- Cloud Storage (Authenticated Mode) ---
 
 export const getUserHoldings = async (userId: string): Promise<Holding[] | null> => {
+  if (!db) {
+    console.warn("Firestore not initialized.");
+    return null;
+  }
   try {
     const docRef = doc(db, 'portfolios', userId);
     const docSnap = await getDoc(docRef);
@@ -44,6 +48,10 @@ export const getUserHoldings = async (userId: string): Promise<Holding[] | null>
 };
 
 export const saveUserHoldings = async (userId: string, holdings: Holding[]): Promise<void> => {
+  if (!db) {
+    console.warn("Firestore not initialized.");
+    return;
+  }
   try {
     const docRef = doc(db, 'portfolios', userId);
     await setDoc(docRef, { 

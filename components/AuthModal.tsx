@@ -19,6 +19,12 @@ const AuthModal: React.FC<AuthModalProps> = ({ onClose }) => {
     setError(null);
     setLoading(true);
 
+    if (!auth) {
+      setError("Firebase not configured. Check console for details or create a .env file.");
+      setLoading(false);
+      return;
+    }
+
     try {
       if (isLogin) {
         await signInWithEmailAndPassword(auth, email, password);

@@ -28,6 +28,16 @@ const App: React.FC = () => {
 
   // Initialize App & Auth Listener
   useEffect(() => {
+    // Graceful fallback if Firebase is not configured
+    if (!auth) {
+      console.log("App running in Local Mode (Firebase not configured)");
+      const localData = getHoldings();
+      setHoldings(localData);
+      handleRefresh(localData);
+      setAuthLoading(false);
+      return;
+    }
+
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       setAuthLoading(true);
@@ -70,7 +80,7 @@ const App: React.FC = () => {
     saveHoldings(newHoldings);
 
     // If logged in, sync to cloud
-    if (user) {
+    if (user && auth) {
       try {
         await saveUserHoldings(user.uid, newHoldings);
       } catch (e) {
@@ -83,15 +93,9 @@ const App: React.FC = () => {
     setIsRefreshing(true);
     try {
       const updated = await refreshMarketPrices(currentHoldings);
-      // We don't call persistHoldings here to avoid infinite loops or unnecessary cloud writes on every refresh
-      // But we update state locally. 
-      // Option: Only save to cloud if values changed significantly? 
-      // For now, let's just update local state and let user action trigger save, 
-      // OR explicitly save updated prices to cloud.
-      // Let's save updated prices to cloud so they persist.
       setHoldings(updated);
       saveHoldings(updated);
-      if (user) saveUserHoldings(user.uid, updated);
+      if (user && auth) saveUserHoldings(user.uid, updated);
       
       setLastUpdated(new Date().toLocaleTimeString('zh-CN', { hour12: false }));
     } finally {
@@ -126,9 +130,6 @@ const App: React.FC = () => {
           ...existing,
           quantity: newTotalQty,
           buyPrice: newAvgPrice,
-          // We keep the existing ID, Name, and buyDate (start date), 
-          // or we could update buyDate to now to indicate latest activity. 
-          // Keeping original ensures the record stays stable.
         };
         affectedIds.push(existing.id);
       } else {
@@ -149,19 +150,17 @@ const App: React.FC = () => {
              // Merge the fresh prices back into the main state
              const finalMix = currentHoldings.map(p => {
                  const fresh = refreshedItems.find(f => f.id === p.id);
-                 // Only update price-related fields from the fetch
                  return fresh ? { 
                    ...p, 
                    currentPrice: fresh.currentPrice, 
                    yesterdayPrice: fresh.yesterdayPrice, 
                    priceDate: fresh.priceDate,
-                   name: fresh.name // In case name was updated from API
+                   name: fresh.name 
                  } : p;
              });
              
-             // Persist the price updates quietly
              saveHoldings(finalMix);
-             if (user) saveUserHoldings(user.uid, finalMix);
+             if (user && auth) saveUserHoldings(user.uid, finalMix);
              
              return finalMix;
          });
@@ -198,8 +197,9 @@ const App: React.FC = () => {
   };
 
   const handleLogout = async () => {
-    await signOut(auth);
-    // State update handled by onAuthStateChanged
+    if (auth) {
+      await signOut(auth);
+    }
   };
 
   const editingHolding = useMemo(() => holdings.find(h => h.id === editingId), [holdings, editingId]);
@@ -257,7 +257,6 @@ const App: React.FC = () => {
   const fmtInt = (val: number) => Math.round(val).toLocaleString('zh-CN');
 
   if (authLoading && !holdings.length) {
-      // Initial loading state
       return <div className="min-h-screen bg-slate-900 flex items-center justify-center text-slate-500">Loading...</div>;
   }
 
@@ -279,7 +278,9 @@ const App: React.FC = () => {
                  {user ? (
                    <span className="text-[10px] bg-indigo-900/50 text-indigo-300 px-1.5 py-0.5 rounded border border-indigo-500/30">Cloud Sync Active</span>
                  ) : (
-                   <span className="text-[10px] bg-slate-700 text-slate-400 px-1.5 py-0.5 rounded">Local Mode</span>
+                   <span className="text-[10px] bg-slate-700 text-slate-400 px-1.5 py-0.5 rounded">
+                     {auth ? 'Local Mode' : 'Offline Mode (No Config)'}
+                   </span>
                  )}
                </div>
             </div>
