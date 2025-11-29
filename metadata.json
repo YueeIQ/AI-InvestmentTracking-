@@ -1,0 +1,5 @@
+{
+  "name": "New WealthTrack AI",
+  "description": "A personal finance tracking dashboard with batch import capabilities, profit-sharing calculation models, and Gemini-powered smart investment suggestions.",
+  "requestFramePermissions": []
+}
